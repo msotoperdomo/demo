@@ -1,0 +1,57 @@
+## Config connector and workload identity demo
+
+kubectl create namespace wi-test
+
+# created a ksa account
+kubectl create serviceaccount --namespace wi-test ksa-wi-test
+
+# created a gsa account
+kubectl apply -f service-account.yaml
+
+kubectl apply -f policy-binding.yaml
+
+kubectl annotate serviceaccount \
+--namespace wi-test \
+ksa-wi-test \
+iam.gke.io/gcp-service-account=gsa-wi-test@[PROJECT-ID].iam.gserviceaccount.com
+
+kubectl run -it \
+--image google/cloud-sdk:slim \
+--serviceaccount ksa-wi-test \
+--namespace wi-test \
+workload-identity-test
+
+# remove annotations
+kubectl annotate serviceaccount \
+--namespace wi-test \
+ksa-wi-test \
+iam.gke.io/gcp-service-account-
+
+
+  ---------------------
+
+# NETWORK POLICIES Demo
+
+kubectl run --generator=run-pod/v1 web --image=nginx --labels app=web --expose --port 80
+
+kubectl run --generator=run-pod/v1 --rm -i -t --image=alpine test-$RANDOM -- sh
+
+wget -qO- http://web
+
+kubectl apply -f web-deny-all.yaml
+
+kubectl run --generator=run-pod/v1 --rm -i -t --image=alpine test-$RANDOM -- sh
+
+## LIMIT TO AN APP
+
+kubectl run --generator=run-pod/v1 apiserver --image=nginx --labels app=bookstore,role=api --expose --port 80
+
+kubectl apply -f api-allow.yaml
+
+kubectl run --generator=run-pod/v1 test-$RANDOM --rm -i -t --image=alpine -- sh
+wget -qO- --timeout=2 http://apiserver
+
+kubectl run --generator=run-pod/v1 test-$RANDOM --rm -i -t --image=alpine --labels app=bookstore,role=frontend -- sh
+wget -qO- --timeout=2 http://apiserver
+
+
